@@ -9,7 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace NeonBearDebloat
+namespace Cub
 {
     internal sealed class BrowserChoice
     {
@@ -124,7 +124,10 @@ namespace NeonBearDebloat
         private Panel _content, _bottom, _side;
         private FlowLayoutPanel _appsFlow;
         private ComboBox _browser, _preset;
-        private TextBox _extras, _customBox;
+        private TextBox _extras, _customBox, _searchBox;
+        private ListView _results;
+        private NButton _searchBtn;
+        private Label _searchStatus;
         private Label _wpLabel, _status;
         private string _wallpaper = "";
         private RichTextBox _log;
@@ -133,7 +136,7 @@ namespace NeonBearDebloat
         private bool _running;
 
         private static readonly string SettingsDir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NeonBear");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Cub");
         private static readonly string LastProfile = Path.Combine(SettingsDir, "last-profile.json");
 
         public MainForm()
@@ -141,7 +144,13 @@ namespace NeonBearDebloat
             using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
                 Theme.Scale = g.DpiX / 96f;
 
-            Text = "NEONBEAR Debloater";
+            Text = "Cub by NeonBear";
+            try
+            {
+                using (Stream ico = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("icon.ico"))
+                    if (ico != null) Icon = new Icon(ico);
+            }
+            catch { }
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = Theme.Body;
@@ -173,11 +182,36 @@ namespace NeonBearDebloat
         private void BuildSidebar()
         {
             _side = new Panel { Dock = DockStyle.Left, Width = S(236), BackColor = Theme.Side };
+            _side.Resize += (s, e) => _side.Invalidate();
             _side.Paint += (s, e) =>
             {
-                Theme.DrawDots(e.Graphics, "NEONBEAR", S(22), S(30), S(4), S(3), Color.White);
-                using (var b = new SolidBrush(Theme.Sub))
-                    e.Graphics.DrawString("D E B L O A T E R", Theme.Small, b, S(22), S(72));
+                Graphics g = e.Graphics;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                try
+                {
+                    using (var ico = new Icon(Icon, new Size(S(56), S(56))))
+                        g.DrawIcon(ico, new Rectangle(S(18), S(22), S(56), S(56)));
+                }
+                catch { }
+                string ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+                using (var big = new Font(Theme.Family, 20f, FontStyle.Bold, GraphicsUnit.Point))
+                using (var white = new SolidBrush(Color.White))
+                using (var grey = new SolidBrush(Theme.Sub))
+                {
+                    g.DrawString("Cub", big, white, S(84), S(14));
+                    g.DrawString("by NeonBear", Theme.Body, grey, S(86), S(50));
+                    g.DrawString("v" + ver, Theme.Small, grey, S(86), S(70));
+                }
+
+                // footer: dot-matrix NEONBEAR wordmark + copyright (only when there is room under the menu)
+                int fy = _side.Height - S(64);
+                if (fy > S(500))
+                {
+                    Theme.DrawDots(g, "NEONBEAR", S(22), fy, S(3), S(2), Theme.Sub);
+                    using (var grey = new SolidBrush(Color.FromArgb(110, 110, 110)))
+                        g.DrawString("Copyright (c) 2026 - NeonBear", Theme.Small, grey, S(20), fy + S(30));
+                }
             };
             Controls.Add(_side);
 
@@ -231,7 +265,7 @@ namespace NeonBearDebloat
         {
             cb.DropDownStyle = ComboBoxStyle.DropDownList;
             cb.FlatStyle = FlatStyle.Flat;
-            cb.BackColor = Theme.Hover;
+            cb.BackColor = Theme.Input;
             cb.ForeColor = Theme.Text;
             cb.Font = Theme.Body;
         }
@@ -277,7 +311,7 @@ namespace NeonBearDebloat
         {
             page.Controls.Add(new Label
             {
-                Text = text, Font = Theme.Bold, ForeColor = Theme.Accent, BackColor = Theme.Bg,
+                Text = text, Font = Theme.Bold, ForeColor = Theme.Text, BackColor = Theme.Bg,
                 AutoSize = false, Height = S(30), Margin = new Padding(0, S(10), 0, S(4))
             });
         }
@@ -356,8 +390,8 @@ namespace NeonBearDebloat
 
             AddToggle(p, "mouse", "Appearance", "Mouse acceleration off", "Turns off \"Enhance pointer precision\" so the cursor moves 1:1.", true);
             AddToggle(p, "sticky", "Appearance", "Disable Sticky Keys shortcut", "No more popup when you tap Shift five times (also Toggle and Filter Keys).", true);
-            AddToggle(p, "fileext", "Appearance", "Show file extensions", "See .txt, .exe and so on in File Explorer.", false);
-            AddToggle(p, "classicmenu", "Appearance", "Classic right-click menu", "Skip \"Show more options\" on Windows 11.", false);
+            AddToggle(p, "fileext", "Appearance", "Show file extensions", "See .txt, .exe and so on in File Explorer.", true);
+            AddToggle(p, "classicmenu", "Appearance", "Classic right-click menu", "Skip \"Show more options\" on Windows 11.", true);
         }
 
         private void BuildAi()
@@ -378,7 +412,7 @@ namespace NeonBearDebloat
             // custom package box
             var card = new Card { Height = S(68), Margin = new Padding(0, 0, 0, S(8)) };
             var cap = new Label { Text = "Add your own app to remove", Font = Theme.Bold, ForeColor = Theme.Text, BackColor = Theme.Card, AutoSize = false, Left = S(18), Top = S(8), Height = S(24), Width = S(400) };
-            _customBox = new TextBox { Left = S(18), Top = S(34), Height = S(26), BackColor = Theme.Hover, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+            _customBox = new TextBox { Left = S(18), Top = S(34), Height = S(26), BackColor = Theme.Input, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
             var add = new NButton { Text = "Add", Width = S(90), Height = S(28), BackColor = Theme.Card };
             card.Controls.AddRange(new Control[] { cap, _customBox, add });
             card.SizeChanged += (s, e) =>
@@ -468,7 +502,7 @@ namespace NeonBearDebloat
             _browser = new ComboBox { Width = S(240) };
             StyleCombo(_browser);
             _browser.Items.AddRange(Browsers);
-            _browser.SelectedIndex = 0;
+            _browser.SelectedIndex = 3;   // Google Chrome
             card.Controls.AddRange(new Control[] { cap, sub, _browser });
             card.SizeChanged += (s, e) =>
             {
@@ -478,14 +512,61 @@ namespace NeonBearDebloat
             };
             p.Controls.Add(card);
 
+            AddToggle(p, "browserupdate", "Software", "Update the browser if it is already installed",
+                "Optional. Off = install only when missing and never run an update check.", true);
+
             AddToggle(p, "removeedge", "Software", "Remove Edge after the new browser installs",
                 "Only runs if a different browser was picked AND installed successfully. WebView2 is kept.", true);
 
-            // extra winget ids
+            // ---- winget search
+            SubHeading(p, "Find and install apps");
+            var sc = new Card { Height = S(318), Margin = new Padding(0, 0, 0, S(8)) };
+            var scap = new Label { Text = "Search winget", Font = Theme.Bold, ForeColor = Theme.Text, BackColor = Theme.Card, AutoSize = false, Left = S(18), Top = S(10), Height = S(24), Width = S(300) };
+            _searchBox = new TextBox { Left = S(18), Top = S(40), Height = S(26), BackColor = Theme.Input, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+            _searchBtn = new NButton { Text = "Search", Width = S(100), Height = S(28), BackColor = Theme.Card };
+            _results = new ListView
+            {
+                Left = S(18), Top = S(76), Height = S(186),
+                View = View.Details, FullRowSelect = true, MultiSelect = true, HeaderStyle = ColumnHeaderStyle.None,
+                BackColor = Color.FromArgb(14, 14, 14), ForeColor = Theme.Text, BorderStyle = BorderStyle.None,
+                Font = Theme.Body, HideSelection = false
+            };
+            _results.Columns.Add("Name", S(260));
+            _results.Columns.Add("Id", S(260));
+            _results.Columns.Add("Version", S(100));
+            DarkMode.Scrollbars(_results);
+            _searchStatus = new Label { Text = "Type a name (e.g. vlc, discord, 7zip) and press Search.", Font = Theme.Small, ForeColor = Theme.Sub, BackColor = Theme.Card, AutoSize = false, AutoEllipsis = true, Left = S(18), Top = S(278), Height = S(24) };
+            var addSel = new NButton { Text = "Add selected", Width = S(130), Height = S(28), BackColor = Theme.Card };
+            sc.Controls.AddRange(new Control[] { scap, _searchBox, _searchBtn, _results, _searchStatus, addSel });
+            sc.SizeChanged += (s, e) =>
+            {
+                _searchBtn.Left = sc.Width - _searchBtn.Width - S(20);
+                _searchBtn.Top = S(39);
+                _searchBox.Width = Math.Max(S(80), _searchBtn.Left - S(18) - S(12));
+                _results.Width = Math.Max(S(200), sc.Width - S(38));
+                addSel.Left = sc.Width - addSel.Width - S(20);
+                addSel.Top = S(276);
+                _searchStatus.Width = Math.Max(S(60), addSel.Left - S(34));
+                // keep the columns proportional to the card
+                int w = _results.Width - SystemInformation.VerticalScrollBarWidth - S(4);
+                _results.Columns[0].Width = (int)(w * 0.42);
+                _results.Columns[1].Width = (int)(w * 0.40);
+                _results.Columns[2].Width = (int)(w * 0.18);
+            };
+            _searchBtn.Click += (s, e) => DoSearch();
+            _searchBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; DoSearch(); }
+            };
+            addSel.Click += (s, e) => AddSelectedResults();
+            _results.DoubleClick += (s, e) => AddSelectedResults();
+            p.Controls.Add(sc);
+
+            // ---- the install list (editable)
             var ex = new Card { Height = S(92), Margin = new Padding(0, 0, 0, S(8)) };
-            var excap = new Label { Text = "Extra apps to install", Font = Theme.Bold, ForeColor = Theme.Text, BackColor = Theme.Card, AutoSize = false, Left = S(18), Top = S(10), Height = S(24), Width = S(400) };
-            var exsub = new Label { Text = "winget package IDs, separated by commas (e.g. VideoLAN.VLC, 7zip.7zip, Discord.Discord).", Font = Theme.Small, ForeColor = Theme.Sub, BackColor = Theme.Card, AutoSize = false, AutoEllipsis = true, Left = S(18), Top = S(35), Height = S(22) };
-            _extras = new TextBox { Left = S(18), Top = S(58), Height = S(26), BackColor = Theme.Hover, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+            var excap = new Label { Text = "Apps that will be installed", Font = Theme.Bold, ForeColor = Theme.Text, BackColor = Theme.Card, AutoSize = false, Left = S(18), Top = S(10), Height = S(24), Width = S(400) };
+            var exsub = new Label { Text = "winget package IDs, separated by commas. Search results land here; you can also type or delete IDs.", Font = Theme.Small, ForeColor = Theme.Sub, BackColor = Theme.Card, AutoSize = false, AutoEllipsis = true, Left = S(18), Top = S(35), Height = S(22) };
+            _extras = new TextBox { Left = S(18), Top = S(58), Height = S(26), BackColor = Theme.Input, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
             ex.Controls.AddRange(new Control[] { excap, exsub, _extras });
             ex.SizeChanged += (s, e) =>
             {
@@ -493,6 +574,68 @@ namespace NeonBearDebloat
                 exsub.Width = Math.Max(S(60), ex.Width - S(36));
             };
             p.Controls.Add(ex);
+        }
+
+        // =========================================================== winget search
+        private void DoSearch()
+        {
+            string q = _searchBox.Text.Trim();
+            if (q.Length == 0) return;
+            _searchBtn.Enabled = false;
+            _searchStatus.ForeColor = Theme.Sub;
+            _searchStatus.Text = "Searching for \"" + q + "\"...";
+            _results.Items.Clear();
+
+            var t = new Thread(() =>
+            {
+                string error;
+                List<WingetHit> hits = WingetSearch.Run(q, out error);
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        _searchBtn.Enabled = true;
+                        if (hits == null || hits.Count == 0)
+                        {
+                            _searchStatus.ForeColor = Theme.Warn;
+                            _searchStatus.Text = error ?? "No results.";
+                            return;
+                        }
+                        _results.BeginUpdate();
+                        foreach (WingetHit h in hits)
+                        {
+                            var item = new ListViewItem(h.Name);
+                            item.SubItems.Add(h.Id);
+                            item.SubItems.Add(h.Version);
+                            _results.Items.Add(item);
+                        }
+                        _results.EndUpdate();
+                        _searchStatus.Text = hits.Count + " result(s). Double-click or select and press Add selected.";
+                    }));
+                }
+                catch (InvalidOperationException) { }
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        private void AddSelectedResults()
+        {
+            var have = new HashSet<string>(
+                (_extras.Text ?? "").Split(new[] { ',', ';', ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries),
+                StringComparer.OrdinalIgnoreCase);
+            int added = 0;
+            foreach (ListViewItem item in _results.SelectedItems)
+            {
+                string id = item.SubItems[1].Text;
+                if (have.Add(id))
+                {
+                    _extras.Text = string.IsNullOrWhiteSpace(_extras.Text) ? id : _extras.Text.TrimEnd().TrimEnd(',') + ", " + id;
+                    added++;
+                }
+            }
+            _searchStatus.ForeColor = added > 0 ? Theme.Good : Theme.Sub;
+            _searchStatus.Text = added > 0 ? "Added " + added + " app(s) to the install list." : "Select a result first (or it is already in the list).";
         }
 
         private void BuildApplyPage()
@@ -516,7 +659,7 @@ namespace NeonBearDebloat
             _restart = new NButton { Text = "Restart PC", Width = S(120), Height = S(34), Top = S(3), BackColor = Theme.Bg, Visible = false };
             _restart.Click += (s, e) =>
             {
-                if (MessageBox.Show("Restart now?", "NEONBEAR", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (MessageBox.Show("Restart now?", "Cub", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
             };
             statusRow.Controls.Add(_status);
@@ -622,23 +765,23 @@ namespace NeonBearDebloat
             }
             catch (Exception e)
             {
-                if (!silent) MessageBox.Show("Could not load that profile: " + e.Message, "NEONBEAR");
+                if (!silent) MessageBox.Show("Could not load that profile: " + e.Message, "Cub");
             }
         }
 
         private void SaveProfileDialog()
         {
-            using (var dlg = new SaveFileDialog { Title = "Save profile", Filter = "NeonBear profile|*.json", FileName = "neonbear-profile.json" })
+            using (var dlg = new SaveFileDialog { Title = "Save profile", Filter = "Cub profile|*.json", FileName = "cub-profile.json" })
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     try { SaveProfileFile(dlg.FileName); }
-                    catch (Exception e) { MessageBox.Show("Could not save: " + e.Message, "NEONBEAR"); }
+                    catch (Exception e) { MessageBox.Show("Could not save: " + e.Message, "Cub"); }
                 }
         }
 
         private void LoadProfileDialog()
         {
-            using (var dlg = new OpenFileDialog { Title = "Load profile", Filter = "NeonBear profile|*.json" })
+            using (var dlg = new OpenFileDialog { Title = "Load profile", Filter = "Cub profile|*.json" })
                 if (dlg.ShowDialog(this) == DialogResult.OK) LoadProfileFile(dlg.FileName, false);
         }
 
@@ -681,7 +824,7 @@ namespace NeonBearDebloat
             string msg = "Ready to apply your selection.";
             if (warn.Length > 0) msg += "\n\nThis includes:\n" + warn;
             msg += "\nContinue?";
-            if (MessageBox.Show(this, msg, "NEONBEAR", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, msg, "Cub", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
 
             try { SaveProfileFile(LastProfile); } catch { }
 

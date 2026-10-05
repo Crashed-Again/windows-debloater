@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WiX v5 installer for Cub by NeonBear. Built by build-msi.bat -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="Cub"
+           Manufacturer="NeonBear"
+           Version="$(Version)"
+           UpgradeCode="D598790F-96D2-4B78-B6CD-C3BD5C08EC53"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <!-- newer versions replace older ones; older ones can not overwrite newer -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Cub is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- icon shown in Settings > Apps and on the shortcuts -->
+    <Icon Id="AppIcon.ico" SourceFile="$(IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPCOMMENTS" Value="Cub by NeonBear - customizable Windows debloat tool" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Cub" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Cub" Level="1">
+      <ComponentRef Id="AppExe" />
+    </Feature>
+
+    <!-- the app, plus Start menu and desktop shortcuts (both show the UAC shield because the exe needs admin) -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AppExe" Guid="*">
+        <File Id="CubExe" Source="$(ExePath)" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Cub"
+                    WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" Advertise="no" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Cub"
+                    WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" Advertise="no" />
+        </File>
+      </Component>
+    </DirectoryRef>
+
+  </Package>
+</Wix>

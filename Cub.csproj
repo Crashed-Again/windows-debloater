@@ -4,11 +4,24 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>NeonBear-Debloat</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- name, icon and version Windows shows (Explorer, taskbar, Task Manager, file Properties) -->
+    <AssemblyName>Cub</AssemblyName>
+    <RootNamespace>Cub</RootNamespace>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <AssemblyTitle>Cub</AssemblyTitle>
+    <Product>Cub</Product>
+    <Authors>NeonBear</Authors>
+    <Company>NeonBear</Company>
+    <Description>Cub by NeonBear - customizable Windows debloat tool</Description>
+    <Copyright>Copyright (c) 2026 NeonBear</Copyright>
+
+    <!-- THE VERSION: change this one line. The app sidebar, file Properties and the .msi all follow it. -->
+    <Version>1.1.0</Version>
 
     <!-- one self-contained .exe, no .NET install needed on the target PC -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -20,6 +33,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="wallpaper.png" LogicalName="wallpaper.png" />
+    <EmbeddedResource Include="icon.ico" LogicalName="icon.ico" />
   </ItemGroup>
 
 </Project>

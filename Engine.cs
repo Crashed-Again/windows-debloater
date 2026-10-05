@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
-namespace NeonBearDebloat
+namespace Cub
 {
     internal enum LogKind { Info, Step, Ok, Warn }
 
@@ -149,7 +149,7 @@ namespace NeonBearDebloat
             return Exec("where.exe", "winget", false, out ignored) == 0;
         }
 
-        private bool InstallOrUpdate(string id, string name)
+        private bool InstallOrUpdate(string id, string name, bool allowUpdate = true)
         {
             if (!WingetAvailable())
             {
@@ -160,8 +160,15 @@ namespace NeonBearDebloat
             string ignored;
             if (Exec("winget", "list --id " + id + " --exact --accept-source-agreements", false, out ignored) == 0)
             {
-                Info(name + " is installed - checking for updates...");
-                Exec("winget", "upgrade --id " + id + " " + common, true, out ignored);   // "no update available" is fine
+                if (allowUpdate)
+                {
+                    Info(name + " is installed - checking for updates...");
+                    Exec("winget", "upgrade --id " + id + " " + common, true, out ignored);   // "no update available" is fine
+                }
+                else
+                {
+                    Info(name + " is already installed - skipping the update check.");
+                }
                 return true;
             }
             Info("Installing " + name + "...");
@@ -263,7 +270,7 @@ namespace NeonBearDebloat
         private void RestorePoint()
         {
             SetReg(HKLM, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore", "SystemRestorePointCreationFrequency", 0);
-            int code = PS("Enable-ComputerRestore -Drive \"$env:SystemDrive\\\"; Checkpoint-Computer -Description 'Before NeonBear Debloat' -RestorePointType MODIFY_SETTINGS");
+            int code = PS("Enable-ComputerRestore -Drive \"$env:SystemDrive\\\"; Checkpoint-Computer -Description 'Before Cub' -RestorePointType MODIFY_SETTINGS");
             if (code == 0) Ok("Restore point created"); else Warn("Could not create a restore point");
         }
 
@@ -288,12 +295,12 @@ namespace NeonBearDebloat
             string wp;
             if (!string.IsNullOrEmpty(o.WallpaperPath) && File.Exists(o.WallpaperPath))
             {
-                wp = Path.Combine(pictures, "NeonBear-wallpaper" + Path.GetExtension(o.WallpaperPath));
+                wp = Path.Combine(pictures, "Cub-wallpaper" + Path.GetExtension(o.WallpaperPath));
                 File.Copy(o.WallpaperPath, wp, true);
             }
             else
             {
-                wp = Path.Combine(pictures, "NeonBear.png");
+                wp = Path.Combine(pictures, "Cub-wallpaper.png");
                 using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("wallpaper.png"))
                 using (FileStream f = File.Create(wp))
                     s.CopyTo(f);
@@ -495,10 +502,10 @@ namespace NeonBearDebloat
 
         private void Browser(bool keepEdge)
         {
-            bool ok = InstallOrUpdate(o.BrowserId, o.BrowserName);
+            bool ok = InstallOrUpdate(o.BrowserId, o.BrowserName, o.Has("browserupdate"));
             if (keepEdge)
             {
-                if (ok) Ok("Edge is up to date");
+                if (ok) Ok(o.Has("browserupdate") ? "Edge is up to date" : "Edge left as it is");
                 return;
             }
             if (!ok)
@@ -506,7 +513,7 @@ namespace NeonBearDebloat
                 Warn("Could not install " + o.BrowserName + (o.Has("removeedge") ? ", so Edge was NOT removed (you would have no browser)." : "."));
                 return;
             }
-            Ok(o.BrowserName + " is installed and up to date");
+            Ok(o.BrowserName + (o.Has("browserupdate") ? " is installed and up to date" : " is installed"));
             if (o.Has("removeedge")) RemoveEdge();
         }
 

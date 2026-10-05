@@ -6,7 +6,7 @@ using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace NeonBearDebloat
+namespace Cub
 {
     // ------------------------------------------------------------------ theme
     internal static class Theme
@@ -14,24 +14,41 @@ namespace NeonBearDebloat
         public static float Scale = 1f;
         public static int S(int v) { return (int)Math.Round(v * Scale); }
 
-        public static readonly Color Bg         = Color.FromArgb(11, 11, 15);
-        public static readonly Color Side       = Color.FromArgb(17, 17, 23);
-        public static readonly Color Card       = Color.FromArgb(24, 24, 32);
-        public static readonly Color Hover      = Color.FromArgb(34, 34, 45);
-        public static readonly Color Border     = Color.FromArgb(44, 44, 58);
-        public static readonly Color Text       = Color.FromArgb(236, 236, 242);
-        public static readonly Color Sub        = Color.FromArgb(142, 142, 158);
-        public static readonly Color Accent     = Color.FromArgb(0, 224, 255);
-        public static readonly Color AccentDim  = Color.FromArgb(0, 150, 170);
-        public static readonly Color AccentText = Color.FromArgb(4, 12, 16);
+        public static readonly Color Bg         = Color.FromArgb(38, 38, 38);
+        public static readonly Color Side       = Color.FromArgb(0, 0, 0);
+        public static readonly Color Card       = Color.FromArgb(20, 20, 20);
+        public static readonly Color Hover      = Color.FromArgb(32, 32, 32);     // nav hover
+        public static readonly Color Btn        = Color.FromArgb(58, 58, 58);     // flat grey button
+        public static readonly Color BtnHover   = Color.FromArgb(78, 78, 78);
+        public static readonly Color Input      = Color.FromArgb(52, 52, 52);
+        public static readonly Color Border     = Color.FromArgb(90, 90, 90);
+        public static readonly Color Text       = Color.FromArgb(232, 232, 232);
+        public static readonly Color Sub        = Color.FromArgb(150, 150, 150);
+        public static readonly Color Accent     = Color.FromArgb(59, 130, 246);
+        public static readonly Color AccentDim  = Color.FromArgb(30, 78, 160);
+        public static readonly Color AccentText = Color.FromArgb(255, 255, 255);
         public static readonly Color Warn       = Color.FromArgb(255, 181, 71);
         public static readonly Color Good       = Color.FromArgb(80, 220, 140);
-        public static readonly Color Off        = Color.FromArgb(62, 62, 76);
+        public static readonly Color Off        = Color.FromArgb(120, 120, 120);
 
-        public static Font Body  = new Font("Segoe UI", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
-        public static Font Small = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point);
-        public static Font Bold  = new Font("Segoe UI Semibold", 10.5f, FontStyle.Regular, GraphicsUnit.Point);
-        public static Font Title = new Font("Segoe UI Semibold", 22f, FontStyle.Regular, GraphicsUnit.Point);
+        // Poppins (what Upscayl uses) if it is installed, otherwise Segoe UI
+        public static readonly string Family = PickFamily();
+        private static string PickFamily()
+        {
+            try
+            {
+                using (var fonts = new InstalledFontCollection())
+                    foreach (FontFamily f in fonts.Families)
+                        if (string.Equals(f.Name, "Poppins", StringComparison.OrdinalIgnoreCase)) return "Poppins";
+            }
+            catch { }
+            return "Segoe UI";
+        }
+
+        public static Font Body  = new Font(Family, 9.5f, FontStyle.Regular, GraphicsUnit.Point);
+        public static Font Small = new Font(Family, 9f, FontStyle.Regular, GraphicsUnit.Point);
+        public static Font Bold  = new Font(Family, 10f, FontStyle.Bold, GraphicsUnit.Point);
+        public static Font Title = new Font(Family, 20f, FontStyle.Bold, GraphicsUnit.Point);
         public static Font Mono  = new Font("Consolas", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
         public static GraphicsPath Round(Rectangle r, int radius)
@@ -117,7 +134,7 @@ namespace NeonBearDebloat
             base.OnPaint(e);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var r = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (var p = Theme.Round(r, Theme.S(12)))
+            using (var p = Theme.Round(r, Theme.S(2)))
             using (var b = new SolidBrush(Theme.Card))
                 e.Graphics.FillPath(b, p);
         }
@@ -160,17 +177,16 @@ namespace NeonBearDebloat
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.SmoothingMode = SmoothingMode.None;
             g.Clear(BackColor);
             var r = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (var p = Theme.Round(r, Height / 2))
-            using (var b = new SolidBrush(_on ? Theme.Accent : Theme.Off))
-                g.FillPath(b, p);
+            using (var b = new SolidBrush(Color.FromArgb(10, 10, 10))) g.FillRectangle(b, r);
+            using (var pen = new Pen(_on ? Theme.Accent : Theme.Border, 1.5f)) g.DrawRectangle(pen, r);
             int pad = Theme.S(3);
             int d = Height - pad * 2 - 1;
             int x = _on ? Width - d - pad - 1 : pad;
-            using (var b = new SolidBrush(_on ? Theme.AccentText : Color.White))
-                g.FillEllipse(b, x, pad, d, d);
+            using (var b = new SolidBrush(_on ? Theme.Accent : Theme.Off))
+                g.FillRectangle(b, x, pad, d, d);
         }
     }
 
@@ -186,7 +202,7 @@ namespace NeonBearDebloat
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             Cursor = Cursors.Hand;
             Font = Theme.Bold;
-            Size = new Size(Theme.S(110), Theme.S(38));
+            Size = new Size(Theme.S(110), Theme.S(40));
         }
 
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -203,19 +219,17 @@ namespace NeonBearDebloat
             Color fill, fore;
             if (Primary)
             {
-                fill = !Enabled ? Color.FromArgb(40, 70, 78) : (_hover ? Color.FromArgb(90, 240, 255) : Theme.Accent);
+                fill = !Enabled ? Color.FromArgb(40, 52, 80) : (_hover ? Color.FromArgb(88, 150, 255) : Theme.Accent);
                 fore = Enabled ? Theme.AccentText : Theme.Sub;
             }
             else
             {
-                fill = !Enabled ? Theme.Card : (_hover ? Theme.Hover : Theme.Card);
+                fill = !Enabled ? Color.FromArgb(42, 42, 42) : (_hover ? Theme.BtnHover : Theme.Btn);
                 fore = Enabled ? Theme.Text : Theme.Sub;
             }
-            using (var p = Theme.Round(r, Theme.S(9)))
-            {
-                using (var b = new SolidBrush(fill)) g.FillPath(b, p);
-                if (!Primary) using (var pen = new Pen(Theme.Border)) g.DrawPath(pen, p);
-            }
+            using (var p = Theme.Round(r, Theme.S(2)))
+            using (var b = new SolidBrush(fill))
+                g.FillPath(b, p);
             using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             using (var b = new SolidBrush(fore))
                 g.DrawString(Text, Font, b, new RectangleF(0, 0, Width, Height), sf);
@@ -254,8 +268,8 @@ namespace NeonBearDebloat
             var inner = new Rectangle(Theme.S(10), Theme.S(3), Width - Theme.S(20), Height - Theme.S(6));
             if (_selected || _hover)
             {
-                using (var p = Theme.Round(inner, Theme.S(8)))
-                using (var b = new SolidBrush(_selected ? Theme.Card : Theme.Hover))
+                using (var p = Theme.Round(inner, Theme.S(2)))
+                using (var b = new SolidBrush(_selected ? Color.FromArgb(34, 34, 34) : Theme.Hover))
                     g.FillPath(b, p);
             }
             if (_selected)
@@ -293,13 +307,13 @@ namespace NeonBearDebloat
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(BackColor);
             var track = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (var p = Theme.Round(track, Height / 2))
+            using (var p = Theme.Round(track, 1))
             using (var b = new SolidBrush(Theme.Card))
                 g.FillPath(b, p);
             int w = (int)((Width - 1) * _value);
             if (w > Height)
             {
-                using (var p = Theme.Round(new Rectangle(0, 0, w, Height - 1), Height / 2))
+                using (var p = Theme.Round(new Rectangle(0, 0, w, Height - 1), 1))
                 using (var b = new LinearGradientBrush(new Rectangle(0, 0, Math.Max(1, w), Height), Theme.AccentDim, Theme.Accent, 0f))
                     g.FillPath(b, p);
             }
